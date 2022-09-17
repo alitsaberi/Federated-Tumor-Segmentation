@@ -59,4 +59,4 @@ def build_data_loaders(
             )
         )
 
-    return train_loaders, val_loaders
+    return train_loaders, val_loaders, len(partitions)

@@ -1,17 +1,12 @@
-from typing import List
-
 import flwr as fl
-import numpy as np
 
-import torch
-
-from utils.helpers import AverageMeter
+from utils.helpers import get_parameters, set_parameters, train
 
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, cid, model, train_loader, optimizer, loss_func, device):
         self.cid = cid
-        self.model = model
+        self.model = model.to_device(device)
         self.train_loader = train_loader
         self.optimizer = optimizer
         self.loss_func = loss_func
@@ -38,41 +33,3 @@ class FlowerClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters, config):
         pass
-
-
-def get_parameters(model) -> List[np.ndarray]:
-    return [val.cpu().numpy() for _, val in model.state_dict().items()]
-
-
-def set_parameters(model, parameters: List[np.ndarray]):
-    params_dict = zip(model.state_dict().keys(), parameters)
-    state_dict = {k: torch.Tensor(v) for k, v in params_dict}
-    model.load_state_dict(state_dict, strict=True)
-
-
-def train(
-    model,
-    train_loader,
-    optimizer,
-    loss_func,
-    device,
-    epochs: int,
-):
-    model.train()
-    epoch_losses = []
-    for epoch in range(epochs):
-        run_loss = AverageMeter()
-        for idx, batch_data in enumerate(train_loader):
-            data, target = batch_data["image"].to(device), batch_data[
-                "label"
-            ].to(device)
-            optimizer.zero_grad()
-            logits = model(data)
-            loss = loss_func(logits, target)
-            loss.backward()
-            optimizer.step()
-            run_loss.update(loss.item(), n=len(batch_data))
-
-        epoch_losses.append(run_loss.avg)
-
-    return epoch_losses
