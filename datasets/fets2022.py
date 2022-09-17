@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, Tuple
+from typing import Union, Callable, Sequence, List
 
 import pandas as pd
 
@@ -13,9 +13,38 @@ class FeTS2022(data.Dataset):
         NATURAL = 1
         ARTIFICIAL = 2
 
+        def __init__(self, value):
+            self._root_dir = None
+            self._subjects_df = None
+
         @property
-        def partitioning_file_name(self):
+        def root_dir(self) -> Path:
+            return self._root_dir
+
+        @root_dir.setter
+        def root_dir(self, value: Union[str, Path]):
+            if isinstance(value, str):
+                value = Path(value)
+
+            self._root_dir = value
+            self._subjects_df = pd.read_csv(
+                self._root_dir / self.partitioning_file_name
+            )
+
+        @property
+        def partitioning_file_name(self) -> str:
             return f"partitioning_{self.value}.csv"
+
+        @property
+        def subjects_df(self):
+            return self._subjects_df
+
+        @property
+        def partitions(self) -> List[int]:
+            if not self.subjects_df:
+                return []
+
+            return self.subjects_df["Partition_ID"].unique().tolist()
 
     def __init__(
         self,
@@ -24,17 +53,8 @@ class FeTS2022(data.Dataset):
         partitioning: str = "natural",
         partition_id: int = 0,
         transform: Callable = None,
-        roi: Tuple[int] = (128, 128, 128),
+        roi: Sequence[int] = (128, 128, 128),
     ):
-
-        try:
-            self.partitioning = FeTS2022.Partitioning.from_str(partitioning)
-        except KeyError:
-            raise ValueError(
-                f"The partitioning {partitioning} is not valid. "
-                f"Partitioning can have one of these values: "
-                f"{FeTS2022.Partitioning.all()}"
-            )
 
         if isinstance(root_dir, str):
             root_dir = Path(root_dir)
@@ -45,6 +65,23 @@ class FeTS2022(data.Dataset):
             else "MICCAI_FeTS2022_ValidationData"
         )
         self.root_dir = root_dir / split_dir_name
+
+        try:
+            self.partitioning = FeTS2022.Partitioning.from_str(partitioning)
+            self.partitioning.root_dir = self.root_dir
+        except KeyError:
+            raise ValueError(
+                f"The partitioning {partitioning} is not valid. "
+                f"Partitioning can have one of these values: "
+                f"{FeTS2022.Partitioning.all()}"
+            )
+
+        if partition_id not in self.partitioning.partitions:
+            raise ValueError(
+                f"The provided partition ID is not valid. "
+                f"Possible partition IDs: "
+                f"{self.partitioning.partitions}"
+            )
         self.partition_id = partition_id
         self.data = self._get_data()
 
@@ -119,19 +156,9 @@ class FeTS2022(data.Dataset):
         return d
 
     def _get_data(self):
-        partitioning_file_path = (
-            self.root_dir / self.partitioning.partitioning_file_name
-        )
 
-        subjects_df = pd.read_csv(partitioning_file_path)
+        subjects_df = self.partitioning.subjects_df
         if self.partition_id:
-            if self.partition_id not in subjects_df["Partition_ID"]:
-                raise ValueError(
-                    f"The provided partition ID is not valid. "
-                    f"Possible partition IDs: "
-                    f"{subjects_df['Partition_ID'].unique()}"
-                )
-
             subjects_df = subjects_df[
                 subjects_df["Partition_ID"] == self.partition_id
             ]
