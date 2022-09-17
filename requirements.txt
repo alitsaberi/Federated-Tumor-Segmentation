@@ -1,2 +1,3 @@
-monai==0.9.1
+monai[nibabel]==0.9.1
 flwr==1.0.0
+pandas==1.4.4
