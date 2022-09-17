@@ -6,14 +6,23 @@ from monai.config import print_config
 
 import torch
 
+from builders.data_loader import build_data_loaders
+from builders.model import build_model
+
 print_config()
 
+data_dir = "./data/FeTS2022"
 roi = (128, 128, 128)
 feature_size = 48
 drop_rate = 0.0
 attn_drop_rate = 0.0
 dropout_path_rate = 0.0
 use_checkpoint = True
+
+partitioning = "natural"
+selected_partitions = None
+shuffle = True
+num_workers = 8
 
 batch_size = 2
 sw_batch_size = 4
@@ -48,6 +57,25 @@ def train_model(args):
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
     else:
         args.device = "cpu"
+
+    model = build_model(
+        img_size=roi,
+        feature_size=feature_size,
+        drop_rate=drop_rate,
+        attn_drop_rate=attn_drop_rate,
+        dropout_path_rate=dropout_path_rate,
+        use_checkpoint=use_checkpoint,
+    ).to_device(args.device)
+
+    train_loaders, val_loaders = build_data_loaders(
+        data_dir,
+        roi,
+        batch_size,
+        partitioning=partitioning,
+        selected_partitions=selected_partitions,
+        shuffle=shuffle,
+        num_workers=num_workers,
+    )
 
 
 if __name__ == "__main__":
