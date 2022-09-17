@@ -16,9 +16,14 @@ def build_data_loaders(
     num_workers: int = 8,
 ):
 
-    partitioning = Partitioning.from_str(partitioning, data_dir)
+    train_partitioning = Partitioning.from_str(partitioning, data_dir)
+    val_partitioning = Partitioning.from_str(
+        partitioning, data_dir, train=False
+    )
     partitions = (
-        selected_partitions if selected_partitions else partitioning.partitions
+        selected_partitions
+        if selected_partitions
+        else train_partitioning.partitions
     )
 
     train_loaders = []
@@ -26,8 +31,13 @@ def build_data_loaders(
 
     for partition_id in partitions:
         train_dataset = FeTS2022(
-            partitioning.get_data(partition_id=partition_id),
+            train_partitioning.get_data(partition_id=partition_id),
             train=True,
+            roi=roi,
+        )
+        val_dataset = FeTS2022(
+            val_partitioning.get_data(partition_id=partition_id),
+            train=False,
             roi=roi,
         )
         train_loaders.append(
@@ -35,6 +45,15 @@ def build_data_loaders(
                 train_dataset,
                 batch_size=batch_size,
                 shuffle=shuffle,
+                num_workers=num_workers,
+                pin_memory=True,
+            )
+        )
+        val_loaders.append(
+            DataLoader(
+                val_dataset,
+                batch_size=1,
+                shuffle=False,
                 num_workers=num_workers,
                 pin_memory=True,
             )
